@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>意見文ガイド</title>
+<style>
+:root{
+  --bg:#f6f3ec; --card:#ffffff; --ink:#2b2f2e; --sub:#5f6b69;
+  --main:#2f6f6a; --main-d:#245853; --main-l:#e3efed;
+  --line:#d8d3c6; --warn:#fff3d6; --warn-line:#e0b84c; --ok:#e8f3e6;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:18px;line-height:1.7}
+header{background:var(--main);color:#fff;padding:12px 16px}
+header h1{margin:0;font-size:20px;font-weight:700}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 40px}
+#progress{max-width:720px;margin:0 auto;padding:14px 16px 4px}
+.bar{display:flex;gap:4px}
+.seg{flex:1;text-align:center;font-size:12px;color:var(--sub)}
+.seg i{display:block;height:8px;border-radius:4px;background:var(--line);margin-bottom:4px}
+.seg.done i{background:var(--main)}
+.seg.now i{background:var(--main-d)}
+.seg.now{color:var(--main-d);font-weight:700}
+#now{font-size:15px;color:var(--sub);margin:6px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;margin-top:12px}
+h2{font-size:21px;margin:0 0 6px;color:var(--main-d)}
+.lead{margin:0 0 8px;color:var(--sub);font-size:16px}
+.field{margin-top:20px}
+label.lab,.lab{display:block;font-weight:700;margin-bottom:2px}
+.hint{font-size:15px;color:var(--sub);margin:0 0 6px}
+input[type=text],textarea{width:100%;font:inherit;font-size:18px;padding:12px;border:2px solid var(--line);
+  border-radius:10px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;line-height:1.7}
+input[type=text]:focus,textarea:focus{outline:none;border-color:var(--main)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chips .cap{width:100%;font-size:14px;color:var(--sub);margin:0}
+button{font:inherit;cursor:pointer;border-radius:12px;min-height:52px;padding:10px 18px;border:2px solid var(--main);
+  background:#fff;color:var(--main-d);font-weight:700;touch-action:manipulation}
+button:active{background:var(--main-l)}
+button.primary{background:var(--main);color:#fff}
+button.primary:active{background:var(--main-d)}
+button.ex{font-weight:400;font-size:15px;min-height:48px;text-align:left;border-color:var(--line);background:#faf8f3;color:var(--ink);border-radius:24px}
+button.opt{flex:1 1 140px}
+button.opt[aria-pressed=true]{background:var(--main);color:#fff}
+.nav{display:flex;gap:12px;margin-top:20px}
+.nav button{flex:1}
+.nav .back{flex:0 0 36%}
+.msg{background:var(--warn);border:2px solid var(--warn-line);border-radius:10px;padding:10px 12px;margin-top:16px;font-size:16px}
+.note{background:var(--main-l);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:15px}
+.check{margin-top:20px;border:2px dashed var(--main);border-radius:12px;padding:10px 12px;background:#f7fbfa}
+.check b{color:var(--main-d)}
+.check label{display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-size:16px;cursor:pointer}
+.check input{width:24px;height:24px;flex:none;margin-top:3px;accent-color:var(--main)}
+.quote{background:#faf8f3;border-left:5px solid var(--main);padding:8px 12px;margin:8px 0;font-size:16px;color:var(--sub);white-space:pre-wrap}
+.count{text-align:right;color:var(--sub);font-size:15px;margin:4px 0}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.row button{flex:1 1 140px}
+#printArea{display:none}
+@media print{
+  body>*:not(#printArea){display:none !important}
+  #printArea{display:block;white-space:pre-wrap;font-size:12pt;line-height:2;color:#000;background:#fff}
+  #printArea h1{font-size:16pt;margin:0 0 12pt}
+}
+</style>
+</head>
+<body>
+<header><h1>意見文ガイド ― 相手に「なるほど」と思ってもらう文を書こう</h1></header>
+<div id="progress"></div>
+<div class="wrap"><div id="main"></div></div>
+<div id="printArea"></div>
+
+<!-- 文章の組み立て（画面に関係しない部分。テストしやすいよう分けてある） -->
+<script id="logic">
+var TYPES = ['数字・データ', '具体的な事例', '体験', '専門家・本・記事の言葉'];
+var STANCES = ['賛成', '反対', '条件つき'];
+
+function clean(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+function stripLead(s){ return s.replace(/^(第一に|第二に|確かに|しかし|以上のことから)[、,，]?\s*/, ''); }
+function noEnd(s){ return s.replace(/[。．.！!？?]+$/, ''); }
+function withEnd(s){ s = clean(s); if (!s) return ''; return /[。！？!?]$/.test(s) ? s : s + '。'; }
+function body(s){ return noEnd(stripLead(clean(s))); }
+
+function stanceText(s){
+  if (s.stance === '賛成') return '賛成';
+  if (s.stance === '反対') return '反対';
+  if (s.stance === '条件つき') return '条件つきで賛成';
+  return '';
+}
+
+function sourceText(e){
+  var src = clean(e.source);
+  if (!src && e.type === '体験') src = '自分の体験';
+  return src ? '（出典：' + src + '）' : '';
+}
+
+function buildEssay(s){
+  var paras = [], p, theme = noEnd(clean(s.theme)), st = stanceText(s);
+
+  p = '';
+  if (theme) p += theme + 'について、';
+  if (st) p += '私は' + st + 'の立場です。';
+  else if (theme) p += '私の考えを述べます。';
+  if (s.stance === '条件つき' && clean(s.condition)) p += 'ただし、' + body(s.condition) + 'が条件です。';
+  p += withEnd(stripLead(clean(s.claim)));
+  if (p) paras.push(p);
+
+  var lead = ['第一に、', '第二に、'];
+  for (var i = 0; i < 2; i++){
+    var e = s.ev[i], c = body(e.content);
+    if (!c) continue;
+    var q = lead[i] + c + sourceText(e) + '。';
+    q += withEnd(stripLead(clean(s.reason[i])));
+    paras.push(q);
+  }
+
+  var ob = body(s.objection), rb = body(s.rebuttal);
+  if (ob || rb){
+    var r = '';
+    if (ob) r += '確かに、' + ob + '。';
+    if (rb) r += (ob ? 'しかし、' : '') + rb + '。';
+    paras.push(r);
+  }
+
+  var cc = body(s.conclusion), call = withEnd(clean(s.call));
+  if (cc || call){
+    var z = '';
+    if (cc) z += '以上のことから、' + cc + '。';
+    z += call;
+    paras.push(z);
+  }
+  return paras.join('\n\n');
+}
+</script>
+
+<script id="ui">
+(function(){
+'use strict';
+
+var STEP_NAMES = ['テーマ', '根拠①', '根拠②', '理由づけ', '反対意見', '結論', '完成'];
+var state, step, warned, checks;
+
+function fresh(){
+  state = {
+    theme:'', stance:'', condition:'', claim:'',
+    ev:[{type:'', content:'', source:''}, {type:'', content:'', source:''}],
+    reason:['', ''], objection:'', rebuttal:'', conclusion:'', call:'', essay:''
+  };
+  step = 0; warned = {}; checks = {};
+}
+fresh();
+
+function el(tag, attrs, kids){
+  var e = document.createElement(tag), k;
+  if (attrs) for (k in attrs){
+    if (k === 'text') e.textContent = attrs[k];
+    else if (k === 'class') e.className = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (kids || []).forEach(function(c){ if (c) e.appendChild(c); });
+  return e;
+}
+
+/* ---------- 各ステップの内容 ---------- */
+var EV_HINT = {
+  '数字・データ': '調べた人（会社や役所）・いつの調査か・数字をそろえて書こう。',
+  '具体的な事例': 'いつ・どこで・だれが・何をしたか、がわかる実際の例を書こう。',
+  '体験': '自分が見たこと、したことを書こう。「そのとき、どう思ったか」も入れよう。',
+  '専門家・本・記事の言葉': '「だれが」「どこで」言ったかを書こう。言葉をそのまま使うときは『 』でかこむよ。'
+};
+var EV_EX = {
+  '数字・データ': ['〇〇の調査によると、〇〇％の人が〜と答えています', '〇〇年と比べて、〜は〇倍にふえています'],
+  '具体的な事例': ['たとえば、〇〇市では〜という取り組みをして、〜になりました', '〇〇中学校では、〜をした結果、〜になりました'],
+  '体験': ['私は〜という経験をしました', '先日、〜のとき、〜ということがありました'],
+  '専門家・本・記事の言葉': ['〇〇さん（専門家）は「〜」と述べています', '〇〇という本には、「〜」と書かれています']
+};
+var EV_SRC_HINT = {
+  '数字・データ': '例：〇〇省「△△調査」（2023年）',
+  '具体的な事例': '例：ニュースの記事名と日付、ホームページの名前',
+  '体験': '空欄でもOK。空欄のときは「自分の体験」と自動で入れるよ。',
+  '専門家・本・記事の言葉': '例：本の題名と書いた人、記事の名前と日付'
+};
+
+function evidenceStep(i){
+  var e = state.ev[i];
+  var t = e.type;
+  var first = (i === 0);
+  var fields = [
+    {kind:'choice', label:'根拠の種類を えらぼう', hint: first ? '4つの中から、いちばん使いやすいものを1つ。' : '①とは別の角度から選ぶと、説得力が上がるよ。',
+     options:TYPES, get:function(){ return e.type; }, set:function(v){ e.type = v; }, short:'根拠の種類', req:true},
+    {kind:'area', rows:3, label:'根拠の内容', hint: t ? EV_HINT[t] : 'さきに種類をえらんでね。',
+     examples: t ? EV_EX[t] : [], get:function(){ return e.content; }, set:function(v){ e.content = v; }, short:'根拠の内容', req:true},
+    {kind:'text', label:'出典（どこで知ったか）', hint: t ? EV_SRC_HINT[t] : '本・記事・サイトの名前など。',
+     get:function(){ return e.source; }, set:function(v){ e.source = v; }, short:'出典', req: (t !== '体験')}
+  ];
+  var notes = [];
+  if (!first && t && state.ev[0].type === t){
+    notes.push('①と同じ種類だよ。ちがう種類（または別の角度）にすると、もっと強くなるよ。このままでもOK。');
+  }
+  return {
+    title: first ? '根拠①：いちばんの理由をささえるもの' : '根拠②：①とは別の角度から',
+    lead: first ? '主張が正しいといえる「証拠」を書こう。' : '①とはちがう見かた（社会全体・身近なくらし・未来 など）から、もう1つ。',
+    fields: fields, notes: notes,
+    checks: [
+      'この根拠は、ほかの人も確かめられる？（出典を見れば同じことがわかる？）',
+      '主張と、ちゃんと関係がある？',
+      '数字や名前を、写しまちがえていない？',
+      t === '体験' ? '自分だけの話で終わらず、ほかの人にも言えそう？' : '「〜らしい」ではなく、はっきりした情報になっている？'
+    ]
+  };
+}
+
+function snip(s){ s = clean(s); return s.length > 60 ? s.slice(0, 60) + '…' : s; }
+
+function reasonStep(){
+  var fields = [];
+  [0, 1].forEach(function(i){
+    var c = snip(state.ev[i].content);
+    fields.push({kind:'area', rows:3,
+      label:'根拠' + (i ? '②' : '①') + 'から、なぜ主張が言える？',
+      quote: c ? '根拠' + (i ? '②' : '①') + '：' + c : '（根拠' + (i ? '②' : '①') + 'は、まだ書いていないよ）',
+      hint:'「この事実があるから、〜と言える」という“つなぎ”を書こう。',
+      examples:['このことから、〜と言えます', 'つまり、〜だからです', 'この事実は、〜ということを表しています'],
+      get:function(){ return state.reason[i]; }, set:function(v){ state.reason[i] = v; },
+      short:'根拠' + (i ? '②' : '①') + 'の理由づけ', req:true});
+  });
+  return {
+    title:'つなぐ言葉：根拠と主張をむすぶ',
+    lead:'根拠だけだと「だから何？」と思われることがあるよ。根拠と主張を、言葉でつなごう。',
+    fields:fields, notes:[],
+    checks:['根拠を読んだ人が「だから？」と思わないかな？', '主張のことばと、つながっている？']
+  };
+}
+
+function objectionStep(){
+  return {
+    title:'反対の意見も考えよう',
+    lead:'ちがう考えの人が言いそうなことを先に書いて、答えておくと、説得力が一気に上がるよ。',
+    fields:[
+      {kind:'area', rows:3, label:'予想される反対意見', hint:'「確かに」は自動でつくから、書かなくていいよ。',
+       examples:['〜という意見もあります', '〜と心配する人もいるでしょう'],
+       get:function(){ return state.objection; }, set:function(v){ state.objection = v; }, short:'反対意見', req:true},
+      {kind:'area', rows:3, label:'それへの反論（こたえ）', hint:'「しかし」は自動でつくよ。根拠や対策をつかって答えよう。',
+       examples:['〜という対策をとれば、解決できます', '〜よりも、〜のほうが大切だからです'],
+       get:function(){ return state.rebuttal; }, set:function(v){ state.rebuttal = v; }, short:'反論', req:true}
+    ], notes:[],
+    checks:['相手の立場になって考えた？', '反対意見をバカにしたり、決めつけたりしていない？', '反論は、根拠にもとづいている？']
+  };
+}
+
+function conclusionStep(){
+  return {
+    title:'むすび：もう一度いうと、そして呼びかけ',
+    lead:'最初の主張を、もう一度ちがう言いかたで。そして読む人に、おねがいや問いかけをしよう。',
+    fields:[
+      {kind:'area', rows:3, label:'結論（主張の言い直し）', hint:'「以上のことから」は自動でつくよ。最初の主張と同じ意味にしよう。',
+       examples:['〜と考えます', '私は、やはり〜だと考えます'],
+       get:function(){ return state.conclusion; }, set:function(v){ state.conclusion = v; }, short:'結論', req:true},
+      {kind:'area', rows:2, label:'読む人への呼びかけ', hint:'読む人に考えてほしいこと、してほしいことを書こう。',
+       examples:['みなさんも、〜について考えてみませんか', '一人ひとりが〜することから始めましょう'],
+       get:function(){ return state.call; }, set:function(v){ state.call = v; }, short:'呼びかけ', req:true}
+    ], notes:[],
+    checks:['最初に書いた主張と、同じ意味になっている？', '新しい話を、急にふやしていない？']
+  };
+}
+
+function themeStep(){
+  var fields = [
+    {kind:'text', label:'テーマ（問いの形で）', hint:'「〜すべきか」「〜は必要か」のように、賛成・反対が分かれる形にしよう。',
+     examples:['中学生はスマートフォンを学校に持ってくるべきか', '給食は残さず食べるべきか', '制服は必要か'],
+     get:function(){ return state.theme; }, set:function(v){ state.theme = v; }, short:'テーマ', req:true},
+    {kind:'choice', label:'あなたの立場', hint:'1つえらぼう。「条件つき」は「〜ならば賛成」というときだよ。',
+     options:STANCES, get:function(){ return state.stance; }, set:function(v){ state.stance = v; }, short:'立場', req:true}
+  ];
+  if (state.stance === '条件つき'){
+    fields.push({kind:'text', label:'どんな条件があれば賛成？', hint:'「〜こと」の形で書くと、「ただし、〜ことが条件です。」と自動でつなぐよ。',
+      examples:['学校でルールを決めること', '使う時間や場所を決めること'],
+      get:function(){ return state.condition; }, set:function(v){ state.condition = v; }, short:'条件', req:true});
+  }
+  fields.push({kind:'area', rows:3, label:'主張（いちばん言いたいことを一文で）', hint:'理由は次から書くので、ここは結論だけ。',
+    examples:['私は、〜と考えます。', '私は、〜すべきだと思います。', '私は、〜は必要ないと考えます。'],
+    get:function(){ return state.claim; }, set:function(v){ state.claim = v; }, short:'主張', req:true});
+  return {
+    title:'まず、テーマと自分の考え',
+    lead:'ここが意見文の“柱”になるよ。',
+    fields:fields, notes:[],
+    checks:['「どっちでもない」ではなく、はっきり言えている？', '一文で、読む人に伝わる？', 'ほかの人が反対しそうな主張になっている？（だれもが賛成することは、意見文にならないよ）']
+  };
+}
+
+function current(){
+  if (step === 0) return themeStep();
+  if (step === 1) return evidenceStep(0);
+  if (step === 2) return evidenceStep(1);
+  if (step === 3) return reasonStep();
+  if (step === 4) return objectionStep();
+  if (step === 5) return conclusionStep();
+  return null;
+}
+
+/* ---------- 画面づくり ---------- */
+function renderProgress(){
+  var p = document.getElementById('progress');
+  p.textContent = '';
+  var bar = el('div', {'class':'bar', role:'list'});
+  STEP_NAMES.forEach(function(n, i){
+    var c = 'seg' + (i < step ? ' done' : '') + (i === step ? ' now' : '');
+    bar.appendChild(el('div', {'class':c, role:'listitem'}, [el('i'), el('span', {text:n})]));
+  });
+  p.appendChild(bar);
+  p.appendChild(el('p', {id:'now', text:'いま ' + (step + 1) + ' / 7：' + STEP_NAMES[step]}));
+}
+
+function insertText(target, txt){
+  var v = target.value;
+  if (!v){ target.value = txt; }
+  else {
+    var a = target.selectionStart, b = target.selectionEnd;
+    if (typeof a === 'number' && document.activeElement === target){
+      target.value = v.slice(0, a) + txt + v.slice(b);
+      target.selectionStart = target.selectionEnd = a + txt.length;
+    } else { target.value = v + txt; }
+  }
+  target.dispatchEvent(new Event('input', {bubbles:true}));
+  target.focus();
+}
+
+function renderField(f, idx){
+  var id = 'f' + step + '_' + idx;
+  var box = el('div', {'class':'field'});
+  box.appendChild(el(f.kind === 'choice' ? 'div' : 'label', {'class':'lab', 'for':id, text:f.label}));
+  if (f.quote) box.appendChild(el('div', {'class':'quote', text:f.quote}));
+  if (f.hint) box.appendChild(el('p', {'class':'hint', text:f.hint}));
+  if (f.kind === 'choice'){
+    var row = el('div', {'class':'chips'});
+    f.options.forEach(function(o){
+      var b = el('button', {type:'button', 'class':'opt', 'aria-pressed': String(f.get() === o), text:o});
+      b.addEventListener('click', function(){ f.set(o); render(true); });
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+    return box;
+  }
+  var inp = f.kind === 'area' ? el('textarea', {id:id, rows:f.rows || 3}) : el('input', {id:id, type:'text', autocomplete:'off'});
+  inp.value = f.get();
+  inp.addEventListener('input', function(){ f.set(inp.value); });
+  box.appendChild(inp);
+  if (f.examples && f.examples.length){
+    var ch = el('div', {'class':'chips'});
+    ch.appendChild(el('p', {'class':'cap', text:'書き出しの例（タップで入るよ）'}));
+    f.examples.forEach(function(x){
+      var b = el('button', {type:'button', 'class':'ex', text:x});
+      b.addEventListener('click', function(){ insertText(inp, x); });
+      ch.appendChild(b);
+    });
+    box.appendChild(ch);
+  }
+  return box;
+}
+
+function emptyList(def){
+  return def.fields.filter(function(f){ return f.req && !clean(f.get()); }).map(function(f){ return f.short; });
+}
+
+function go(n){ if (n === 6) state.essay = ''; step = n; render(); window.scrollTo(0, 0); }
+
+function renderStep(){
+  var def = current(), m = document.getElementById('main');
+  var card = el('div', {'class':'card'});
+  card.appendChild(el('h2', {text:def.title}));
+  card.appendChild(el('p', {'class':'lead', text:def.lead}));
+  def.fields.forEach(function(f, i){ card.appendChild(renderField(f, i)); });
+  def.notes.forEach(function(n){ card.appendChild(el('div', {'class':'note', text:n})); });
+
+  var ck = el('div', {'class':'check'}, [el('b', {text:'✔ セルフチェック（書けたら見てみよう）'})]);
+  def.checks.forEach(function(q, i){
+    var key = step + '_' + i;
+    var cb = el('input', {type:'checkbox'});
+    cb.checked = !!checks[key];
+    cb.addEventListener('change', function(){ checks[key] = cb.checked; });
+    ck.appendChild(el('label', null, [cb, el('span', {text:q})]));
+  });
+  card.appendChild(ck);
+
+  var msg = el('div', {'class':'msg', role:'status', style:'display:none'});
+  card.appendChild(msg);
+
+  var nav = el('div', {'class':'nav'});
+  if (step > 0){
+    var bk = el('button', {type:'button', 'class':'back', text:'← もどる'});
+    bk.addEventListener('click', function(){ go(step - 1); });
+    nav.appendChild(bk);
+  }
+  var nx = el('button', {type:'button', 'class':'primary', text: step === 5 ? '文章をつくる →' : 'つぎへ →'});
+  nx.addEventListener('click', function(){
+    var cur = current(), empty = emptyList(cur);
+    if (empty.length && !warned[step]){
+      warned[step] = true;
+      msg.textContent = 'まだ書いていないところがあるよ（' + empty.join('、') + '）。書いてから進むと、いい文章になるよ。このまま進んでもいいなら、もう一度「' + nx.textContent.replace(' →', '') + '」をおしてね。';
+      msg.style.display = 'block';
+      msg.scrollIntoView({block:'center', behavior:'smooth'});
+      return;
+    }
+    go(step + 1);
+  });
+  nav.appendChild(nx);
+  card.appendChild(nav);
+  m.appendChild(card);
+}
+
+var FINAL_CHECKS = [
+  '主張がはっきり書けている',
+  '根拠が2つあり、見かたがちがう',
+  '根拠に出典（どこで知ったか）がある',
+  '根拠と主張が、理由づけでつながっている',
+  '反対意見にも答えている',
+  '結論が、最初の主張と合っている',
+  '「です・ます」か「だ・である」のどちらかにそろっている',
+  '声に出して読んで、おかしなところがない',
+  '漢字や送りがなをまちがえていない',
+  '先生に言われた文字数や決まりに合っている'
+];
+
+function renderFinal(){
+  var m = document.getElementById('main');
+  var card = el('div', {'class':'card'});
+  card.appendChild(el('h2', {text:'完成！ 読み直して、直そう'}));
+  card.appendChild(el('p', {'class':'lead', text:'入力から文章を組み立てたよ。ことばを直したり、つなぎを足したりして、自分の文章にしてね。'}));
+  var ta = el('textarea', {id:'essay', rows:16, 'aria-label':'意見文'});
+  ta.value = state.essay;
+  var cnt = el('div', {'class':'count', id:'cnt'});
+  function upd(){ state.essay = ta.value; cnt.textContent = ta.value.replace(/\s/g, '').length + ' 文字（空白・改行をのぞく）'; }
+  ta.addEventListener('input', upd);
+  upd();
+  card.appendChild(ta);
+  card.appendChild(cnt);
+
+  var status = el('div', {'class':'note', role:'status', style:'display:none'});
+  function say(t){ status.textContent = t; status.style.display = 'block'; }
+
+  var row = el('div', {'class':'row'});
+  var bc = el('button', {type:'button', 'class':'primary', text:'コピーする'});
+  bc.addEventListener('click', function(){ copyText(ta, say); });
+  var bp = el('button', {type:'button', 'class':'primary', text:'印刷する'});
+  bp.addEventListener('click', function(){
+    var pa = document.getElementById('printArea');
+    pa.textContent = '';
+    pa.appendChild(el('h1', {text:noEnd(clean(state.theme)) || '意見文'}));
+    pa.appendChild(document.createTextNode(ta.value));
+    window.print();
+  });
+  var br = el('button', {type:'button', text:'もう一度、自動で組み立てる'});
+  br.addEventListener('click', function(){
+    if (window.confirm('いま直した文章が、組み立て直した文章に変わります。いいですか？')){
+      state.essay = buildEssay(state); ta.value = state.essay; upd(); say('組み立て直したよ。');
+    }
+  });
+  row.appendChild(bc); row.appendChild(bp); row.appendChild(br);
+  card.appendChild(row);
+  card.appendChild(status);
+
+  var ck = el('div', {'class':'check'}, [el('b', {text:'✔ 最後のチェックリスト'})]);
+  FINAL_CHECKS.forEach(function(q, i){
+    var key = 'final_' + i, cb = el('input', {type:'checkbox'});
+    cb.checked = !!checks[key];
+    cb.addEventListener('change', function(){ checks[key] = cb.checked; });
+    ck.appendChild(el('label', null, [cb, el('span', {text:q})]));
+  });
+  card.appendChild(ck);
+  card.appendChild(el('div', {'class':'note', text:'ここに書いた内容は、このページの中だけにあって、どこにも保存されないよ。ページを閉じると消えるので、コピーか印刷をわすれずに！ 「もどる」と、文章は組み立て直しになるよ。'}));
+
+  var nav = el('div', {'class':'nav'});
+  var bk = el('button', {type:'button', 'class':'back', text:'← もどる'});
+  bk.addEventListener('click', function(){ go(5); });
+  var rs = el('button', {type:'button', text:'最初からやり直す'});
+  rs.addEventListener('click', function(){
+    if (window.confirm('書いたものが、すべて消えます。最初からやり直しますか？')){ fresh(); go(0); }
+  });
+  nav.appendChild(bk); nav.appendChild(rs);
+  card.appendChild(nav);
+  m.appendChild(card);
+}
+
+function copyText(ta, say){
+  var t = ta.value;
+  function fallback(){
+    try {
+      ta.focus(); ta.select();
+      var ok = document.execCommand('copy');
+      ta.setSelectionRange(0, 0);
+      say(ok ? 'コピーしたよ。' : 'コピーできなかったよ。文章を長おしして、コピーしてね。');
+    } catch (e){ say('コピーできなかったよ。文章を長おしして、コピーしてね。'); }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ say('コピーしたよ。'); }, fallback);
+  } else { fallback(); }
+}
+
+function render(keepScroll){
+  var y = window.pageYOffset;
+  document.getElementById('main').textContent = '';
+  if (step === 6 && !state.essay) state.essay = buildEssay(state);
+  renderProgress();
+  if (step === 6) renderFinal(); else renderStep();
+  if (keepScroll) window.scrollTo(0, y);
+}
+
+render();
+})();
+</script>
+</body>
+</html>
